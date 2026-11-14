@@ -1,0 +1,3 @@
+[submodule "submodules/laravel-ddd-core"]
+	path = submodules/laravel-ddd-core
+	url = git@github.com:bit-craft-io/laravel-ddd-core.git

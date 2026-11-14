@@ -1,0 +1,124 @@
+services:
+  app:
+    build: ./container/php
+    environment:
+      TZ: 'Asia/Tokyo'
+    volumes:
+      - /var/www/${__WSL_COMPOSE_PROJECT_DIR:-none}:/var/www/source
+      - ./container/php/php.ini:/usr/local/etc/php/php.ini:ro
+      - ./container/php/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini:ro
+      - ./container/php/.bash_aliases:/root/.bash_aliases:ro
+      - ./container/php/.bashrc:/root/.bashrc:ro
+    working_dir: /var/www/source
+    networks:
+      - network-bc-draft
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+  job:
+    build: ./container/job
+    environment:
+      TZ: 'Asia/Tokyo'
+    volumes:
+      - /var/www/${__WSL_COMPOSE_PROJECT_DIR:-none}:/var/www/source
+      - ./container/job/php.ini:/usr/local/etc/php/php.ini:ro
+      - ./container/job/.bash_aliases:/root/.bash_aliases:ro
+      - ./container/job/.bashrc:/root/.bashrc:ro
+      - ./container/job/system:/etc/systemd/system
+      - ./container/job/entrypoint.sh:/entrypoint.sh
+    working_dir: /var/www/source
+    privileged: true
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    command: /lib/systemd/systemd
+    depends_on:
+      - app
+    networks:
+      - network-bc-draft
+    restart: always
+  nginx:
+    image: nginx
+    environment:
+      TZ: 'Asia/Tokyo'
+    ports:
+      - 8080:80
+      - 8443:443
+    volumes:
+      - /var/www/${__WSL_COMPOSE_PROJECT_DIR:-none}:/var/www/source
+      - ./container/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./container/nginx/ssl:/etc/nginx/ssl
+    working_dir: /var/www/source
+    depends_on:
+      - app
+    networks:
+      - network-bc-draft
+    restart: always
+  mysql_master:
+    container_name: mysql_master
+    build:
+      context: ./container/mysql/master
+      dockerfile: Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      TZ: 'Asia/Tokyo'
+    volumes:
+      - mysql_master:/var/lib/mysql
+      - ./container/mysql/master/init.d:/docker-entrypoint-initdb.d
+    ports:
+      - 3306:3306
+    privileged: true
+    networks:
+      - network-bc-draft
+    restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  mysql_slave:
+    container_name: mysql_slave
+    build:
+      context: ./container/mysql/slave
+      dockerfile: Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      TZ: 'Asia/Tokyo'
+    volumes:
+      - mysql_slave:/var/lib/mysql
+      - ./container/mysql/slave/init.d:/docker-entrypoint-initdb.d
+    ports:
+      - 3316:3306
+    depends_on:
+      mysql_master:
+        condition: service_healthy
+    networks:
+      - network-bc-draft
+    restart: always
+  redis:
+    image: redis:7.0
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - network-bc-draft
+    depends_on:
+      - app
+    restart: always
+  redoc:
+    build: ./container/redoc
+    environment:
+      TZ: 'Asia/Tokyo'
+    volumes:
+      - /var/www/${__WSL_COMPOSE_PROJECT_DIR:-none}:/var/www/source
+    working_dir: /var/www/source
+    networks:
+      - network-bc-draft
+    restart: always
+    command: tail -f /dev/null
+volumes:
+  mysql_master:
+  mysql_slave:
+  redis_data:
+networks:
+  network-bc-draft:
+    driver: bridge

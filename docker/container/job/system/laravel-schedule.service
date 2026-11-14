@@ -1,0 +1,12 @@
+[Unit]
+Description=Laravel Schedule Service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/var/www/source
+ExecStart=php artisan schedule:run
+
+[Install]
+WantedBy=multi-user.target

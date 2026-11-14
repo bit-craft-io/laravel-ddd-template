@@ -1,0 +1,12 @@
+[Unit]
+Description=Laravel Worker Service
+
+[Service]
+User=root
+Group=root
+Restart=always
+WorkingDirectory=/var/www/source
+ExecStart=php artisan queue:work --sleep=3 --tries=1
+
+[Install]
+WantedBy=multi-user.target
